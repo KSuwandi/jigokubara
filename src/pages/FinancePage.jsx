@@ -20,6 +20,7 @@ import {
   startAfter,
   where,
   increment,
+  runTransaction,
 } from "firebase/firestore";
 
 import AppLayout from "../layouts/AppLayout";
@@ -36,35 +37,35 @@ const PRICE_LIST = [
 
   {
     category: "Senjata",
-    title: "PELURU 9MM",
+    title: "Peluru 9mm",
     merah: 150000,
     putih: 150000,
   },
 
   {
     category: "Senjata",
-    title: "PELURU .44 (MAGNUM)",
+    title: "Peluru .44 Magnum",
     merah: 70000,
     putih: 70000,
   },
 
   {
     category: "Senjata",
-    title: "PELURU Double Action",
+    title: "Peluru Double Action",
     merah: 75000,
     putih: 75000,
   },
 
   {
     category: "Senjata",
-    title: "VEST",
-    merah: 80000,
-    putih: 70000,
+    title: "Medium Armor",
+    merah: 130000,
+    putih: 105000,
   },
 
   {
     category: "Senjata",
-    title: "COMBAT PISTOL",
+    title: "Combat",
     merah: 200000,
     putih: 180000,
   },
@@ -85,28 +86,28 @@ const PRICE_LIST = [
 
   {
     category: "Senjata",
-    title: "PYTHON",
+    title: "Python",
     merah: 400000,
     putih: 360000,
   },
 
   {
     category: "Senjata",
-    title: "AK 47",
+    title: "AK-47",
     merah: 650000,
     putih: 585000,
   },
 
   {
     category: "Senjata",
-    title: "HEAVY SNIPER",
+    title: "Heavy Sniper",
     merah: 1250000,
     putih: 1125000,
   },
 
   {
     category: "Senjata",
-    title: "DOUBLE ACTION",
+    title: "Double Action",
     merah: 450000,
     putih: 370000,
   },
@@ -118,23 +119,6 @@ const PRICE_LIST = [
     putih: 130000,
   },
 
-    // =========================
-  // PAKET
-  // =========================
-
-  {
-    category: "Paket",
-    title: "1 SET FULL CASH",
-    merah: 1590000,
-    putih: 1300000,
-  },
-
-  {
-    category: "Paket",
-    title: "1 SET PYTHON",
-    merah: 790000,
-    putih: 710000,
-  },
 
 ];
 
@@ -213,6 +197,123 @@ useState({
 
   const [selectedPriceItem, setSelectedPriceItem] =
   useState("");
+
+  const [showPriceDropdown, setShowPriceDropdown] = useState(false);
+  const [priceSearch, setPriceSearch] = useState("");
+
+  const [selectedPriceQuantity, setSelectedPriceQuantity] =
+    useState(1);
+
+  const [withdrawCart, setWithdrawCart] =
+    useState([]);
+
+  const withdrawCartTotal = useMemo(
+    () => withdrawCart.reduce(
+      (total, item) => total + Number(item.unitPrice || 0) * Number(item.quantity || 0),
+      0
+    ),
+    [withdrawCart]
+  );
+
+  const normalizeItemName = (value = "") =>
+    value.toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+  const findInventoryMatch = (priceTitle) => {
+    const normalizedTitle = normalizeItemName(priceTitle);
+    return inventoryItems.find(
+      (inventoryItem) => normalizeItemName(inventoryItem.name) === normalizedTitle
+    );
+  };
+
+  // Jumlah unit fisik yang dipotong dari inventory untuk setiap paket pricelist.
+  // Barang selain peluru tetap menggunakan rasio 1:1.
+  const getUnitsPerPackage = (priceTitle) => {
+    const normalizedTitle = normalizeItemName(priceTitle);
+    const packageMultipliers = {
+      [normalizeItemName("PELURU 9MM")]: 150,
+      [normalizeItemName("PELURU .44 (MAGNUM)")]: 50,
+      [normalizeItemName("PELURU Double Action")]: 50,
+    };
+    return packageMultipliers[normalizedTitle] || 1;
+  };
+
+  const handleAddWithdrawItem = () => {
+    const priceItem = PRICE_LIST.find((item) => item.title === selectedPriceItem);
+    const quantity = Number(selectedPriceQuantity);
+    // Inventory dipetakan otomatis berdasarkan nama barang; pengguna tidak perlu memilih inventory manual.
+    const inventoryItem = findInventoryMatch(priceItem?.title || selectedPriceItem);
+
+    if (!priceItem) {
+      toast.error("Pilih barang dari pricelist terlebih dahulu");
+      return;
+    }
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      toast.error("Jumlah barang minimal 1 dan harus berupa angka bulat");
+      return;
+    }
+
+    if (!inventoryItem) {
+      toast.error("Barang ini belum cocok dengan nama di inventory. Samakan nama barang di inventory agar stok bisa dipotong otomatis.");
+      return;
+    }
+
+    const unitPrice = form.moneyType === "Uang Merah" ? priceItem.merah : priceItem.putih;
+    const unitsPerPackage = getUnitsPerPackage(priceItem.title);
+    const alreadyAdded = withdrawCart.find((item) => item.priceTitle === priceItem.title);
+    const requestedQuantity = quantity + Number(alreadyAdded?.quantity || 0);
+    const requestedInventoryUnits = requestedQuantity * unitsPerPackage;
+
+    if (alreadyAdded && alreadyAdded.inventoryItemId !== inventoryItem.id) {
+      toast.error("Barang pricelist ini sudah ada di keranjang dengan mapping inventory berbeda");
+      return;
+    }
+
+    if (Number(inventoryItem.stock || 0) < requestedInventoryUnits) {
+      toast.error(
+        `Stok ${inventoryItem.name} tidak cukup. Dibutuhkan: ${requestedInventoryUnits} pcs, tersedia: ${Number(inventoryItem.stock || 0)} pcs`
+      );
+      return;
+    }
+
+    if (alreadyAdded) {
+      setWithdrawCart((previous) => previous.map((item) => {
+        if (item.priceTitle !== priceItem.title) return item;
+        const newQuantity = Number(item.quantity || 0) + quantity;
+        return {
+          ...item,
+          quantity: newQuantity,
+          unitsPerPackage,
+          inventoryQuantity: newQuantity * unitsPerPackage,
+          lineTotal: unitPrice * newQuantity,
+        };
+      }));
+    } else {
+      setWithdrawCart((previous) => [
+        ...previous,
+        {
+          priceTitle: priceItem.title,
+          itemName: inventoryItem.name,
+          inventoryItemId: inventoryItem.id,
+          quantity,
+          unitsPerPackage,
+          inventoryQuantity: quantity * unitsPerPackage,
+          unitPrice,
+          lineTotal: unitPrice * quantity,
+        },
+      ]);
+    }
+
+    setSelectedPriceQuantity(1);
+    setSelectedPriceItem("");
+    setShowPriceDropdown(false);
+    setPriceSearch("");
+    toast.success(`${priceItem.title} ditambahkan ke keranjang`);
+  };
+
+  const removeWithdrawCartItem = (priceTitle) => {
+    setWithdrawCart((previous) => previous.filter((item) => item.priceTitle !== priceTitle));
+  };
 
   // =====================================
   // CREATE ACTIVITY LOG
@@ -634,6 +735,15 @@ useEffect(() => {
       )
   );
 
+  const filteredPriceItems = PRICE_LIST.filter((item) =>
+    `${item.title} ${item.category}`.toLowerCase().includes(priceSearch.toLowerCase())
+  );
+
+  const selectedPriceDetails = PRICE_LIST.find((item) => item.title === selectedPriceItem);
+  const selectedMatchedInventory = selectedPriceDetails
+    ? findInventoryMatch(selectedPriceDetails.title)
+    : null;
+
   const filteredTransactions =
     useMemo(() => {
 
@@ -667,161 +777,112 @@ useEffect(() => {
   // =====================================
   // ADD TRANSACTION
   // =====================================
-  const handleSubmit =
-    async (e) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) return;
 
-      e.preventDefault();
+    const isWithdraw = form.type === "Withdraw";
 
-      if (!user) return;
-
-      if (
-        !form.title.trim()
-      ) {
-
-        toast.error(
-          "Judul transaksi wajib diisi"
-        );
-
-        return;
-      }
-
-      if (
-        !form.amount
-      ) {
-
-        toast.error(
-          "Jumlah uang wajib diisi"
-        );
-
-        return;
-      }
-
-      if (!form.note.trim()) {
-
-        toast.error(
-          "Catatan transaksi wajib diisi"
-        );
-
-        return;
-      }
-
-      if (
-      form.type ===
-        "Deposit" &&
-      !form.imageUrl
-    ) {
-
-      toast.error(
-        "Foto bukti deposit wajib diupload"
-      );
-
+    if (isWithdraw && withdrawCart.length === 0) {
+      toast.error("Tambahkan minimal satu barang ke keranjang withdraw");
       return;
     }
 
-      const amount =
-        Number(form.amount);
+    if (!isWithdraw && !form.title.trim()) {
+      toast.error("Judul transaksi wajib diisi");
+      return;
+    }
 
-      if (
-        amount <= 0
-      ) {
+    if (!isWithdraw && !form.amount) {
+      toast.error("Jumlah uang wajib diisi");
+      return;
+    }
 
-        toast.error(
-          "Jumlah uang tidak valid"
-        );
+    if (!form.note.trim()) {
+      toast.error("Catatan transaksi wajib diisi");
+      return;
+    }
 
-        return;
-      }
+    if (form.type === "Deposit" && !form.imageUrl) {
+      toast.error("Foto bukti deposit wajib diupload");
+      return;
+    }
 
-      try {
+    const amount = isWithdraw ? withdrawCartTotal : Number(form.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Jumlah uang tidak valid");
+      return;
+    }
 
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        await addDoc(
-          collection(
-            db,
-            "users",
-            user.uid,
-            "finance"
-          ),
-          {
+      const transactionData = {
+        ...(isWithdraw
+          ? {
+              items: withdrawCart.map((item) => ({
+                priceTitle: item.priceTitle,
+                itemName: item.itemName,
+                inventoryItemId: item.inventoryItemId,
+                quantity: Number(item.quantity),
+                unitsPerPackage: Number(
+                  item.unitsPerPackage || getUnitsPerPackage(item.priceTitle)
+                ),
+                inventoryQuantity: Number(
+                  item.inventoryQuantity ??
+                    Number(item.quantity) * getUnitsPerPackage(item.priceTitle)
+                ),
+                unitPrice: Number(item.unitPrice),
+                lineTotal: Number(item.unitPrice) * Number(item.quantity),
+              })),
+              title: `Withdraw ${withdrawCart.length} barang`,
+              quantity: withdrawCart.reduce((sum, item) => sum + Number(item.quantity), 0),
+            }
+          : {
+              inventoryItemId: form.inventoryItemId,
+              quantity: Number(form.quantity || 1),
+              title: form.title.trim(),
+            }),
+        type: form.type,
+        paymentType: form.paymentType,
+        moneyType: form.moneyType,
+        role: role || "",
+        amount,
+        note: form.note.trim(),
+        imageUrl: form.imageUrl || "",
+        createdBy: user.rpName || "Unknown",
+        createdByUid: user.uid,
+        status: "Pending",
+        createdAt: serverTimestamp(),
+      };
 
-            inventoryItemId:
-              form.inventoryItemId,
+      await addDoc(
+        collection(db, "users", user.uid, "finance"),
+        transactionData
+      );
 
-            quantity:
-              Number(form.quantity || 1),
-
-            type:
-              form.type,
-
-            paymentType:
-              form.paymentType,
-
-            moneyType:
-              form.moneyType,
-
-            role: 
-              role || "",
-
-            title:
-              form.title.trim(),
-
-            amount,
-
-            note:
-              form.note.trim(),
-
-            imageUrl:
-             form.imageUrl || "",
-
-            createdBy:
-              user.rpName ||
-              "Unknown",
-
-            createdByUid:
-              user.uid,
-
-            status:
-              "Pending",
-
-            createdAt:
-              serverTimestamp(),
-          }
-        );
-
-        toast.success(
-          `${form.type} berhasil dikirim untuk approval`
-        );
-
-       setForm({
-  type: "Deposit",
-  paymentType: "Cash",
-  moneyType: "Uang Putih",
-
-  inventoryItemId: "",
-  quantity: 1,
-
-  title: "",
-  amount: "",
-  note: "",
-  imageUrl: "",
-});
-
-      } catch (error) {
-
-        console.error(
-          error
-        );
-
-        toast.error(
-          "Gagal menambahkan transaksi"
-        );
-
-      } finally {
-
-        setLoading(false);
-      }
-    };
+      toast.success(`${form.type} berhasil dikirim untuk approval`);
+      setForm({
+        type: "Deposit",
+        paymentType: "Cash",
+        moneyType: "Uang Putih",
+        inventoryItemId: "",
+        quantity: 1,
+        title: "",
+        amount: "",
+        note: "",
+        imageUrl: "",
+      });
+      setSelectedPriceItem("");
+      setSelectedPriceQuantity(1);
+      setWithdrawCart([]);
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal menambahkan transaksi");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // =====================================
   // BAYAR HUTANG
@@ -958,76 +1019,149 @@ useEffect(() => {
   // APPROVE PAYMENT
   // =====================================
   const approvePayment = async (item) => {
-
-  try {
-
     if (role !== "Oyabun") {
-
-      toast.error(
-        "Hanya Oyabun yang bisa approve"
-      );
-
+      toast.error("Hanya Oyabun yang bisa approve");
       return;
     }
 
-    const transactionRef = doc(
-      db,
-      "users",
-      item.createdByUid || user.uid,
-      "finance",
-      item.id
-    );
-
-    await updateDoc(
-      transactionRef,
-      {
-        status: "Approved",
-        approvedBy: user.rpName,
-        approvedAt: serverTimestamp(),
-      }
-    );
-
-    // =====================================
-    // AUTO TAMBAH INVENTORY
-    // =====================================
-
-    if (
-      item.type === "Deposit" &&
-      item.inventoryItemId
-    ) {
-
-      const inventoryRef = doc(
+    try {
+      setLoading(true);
+      const transactionRef = doc(
         db,
-        "inventory",
-        item.inventoryItemId
+        "users",
+        item.createdByUid || user.uid,
+        "finance",
+        item.id
       );
+      const borrowedRef = item.type === "Withdraw" && Array.isArray(item.items) && item.items.length
+        ? doc(collection(db, "borrowed_items"))
+        : null;
 
-      await updateDoc(
-  inventoryRef,
-  {
-    stock: increment(
-      Number(item.quantity || 1)
-    ),
-  }
-);
+      await runTransaction(db, async (transaction) => {
+        const transactionSnapshot = await transaction.get(transactionRef);
+        if (!transactionSnapshot.exists()) {
+          throw new Error("Transaksi tidak ditemukan");
+        }
+        const freshItem = transactionSnapshot.data();
+        if (freshItem.status !== "Pending") {
+          throw new Error("Transaksi ini sudah diproses sebelumnya");
+        }
 
+        let stockChanges = [];
+        if (freshItem.type === "Deposit" && freshItem.inventoryItemId) {
+          stockChanges = [{
+            id: freshItem.inventoryItemId,
+            quantity: Number(freshItem.quantity || 1),
+            direction: "add",
+          }];
+        } else if (freshItem.type === "Withdraw") {
+          if (Array.isArray(freshItem.items) && freshItem.items.length) {
+            const byInventoryId = new Map();
+            freshItem.items.forEach((withdrawItem) => {
+              if (!withdrawItem.inventoryItemId) {
+                throw new Error(`Barang ${withdrawItem.itemName || withdrawItem.priceTitle} belum terhubung ke inventory`);
+              }
+              // Transaksi baru menyimpan inventoryQuantity. Transaksi lama yang belum
+              // memiliki field tersebut dihitung memakai multiplier berdasarkan pricelist.
+              const quantity = Number(
+                withdrawItem.inventoryQuantity ??
+                  Number(withdrawItem.quantity || 0) *
+                    getUnitsPerPackage(withdrawItem.priceTitle || withdrawItem.itemName)
+              );
+              if (!Number.isInteger(quantity) || quantity < 1) {
+                throw new Error("Jumlah barang withdraw tidak valid");
+              }
+              byInventoryId.set(
+                withdrawItem.inventoryItemId,
+                (byInventoryId.get(withdrawItem.inventoryItemId) || 0) + quantity
+              );
+            });
+            stockChanges = Array.from(byInventoryId.entries()).map(([id, quantity]) => ({
+              id,
+              quantity,
+              direction: "subtract",
+            }));
+          } else if (freshItem.inventoryItemId) {
+            stockChanges = [{
+              id: freshItem.inventoryItemId,
+              quantity: Number(freshItem.quantity || 1),
+              direction: "subtract",
+            }];
+          }
+        }
+
+        const inventorySnapshots = [];
+        for (const change of stockChanges) {
+          const inventoryRef = doc(db, "inventory", change.id);
+          const inventorySnapshot = await transaction.get(inventoryRef);
+          if (!inventorySnapshot.exists()) {
+            throw new Error("Barang inventory tidak ditemukan");
+          }
+          const currentStock = Number(inventorySnapshot.data().stock || 0);
+          if (change.direction === "subtract" && currentStock < change.quantity) {
+            throw new Error(`Stok ${inventorySnapshot.data().name || "barang"} tidak cukup. Tersedia: ${currentStock}`);
+          }
+          inventorySnapshots.push({ inventoryRef, change, currentStock });
+        }
+
+        inventorySnapshots.forEach(({ inventoryRef, change, currentStock }) => {
+          transaction.update(inventoryRef, {
+            stock: change.direction === "add"
+              ? currentStock + change.quantity
+              : currentStock - change.quantity,
+          });
+        });
+
+        transaction.update(transactionRef, {
+          status: "Approved",
+          approvedBy: user.rpName || "Oyabun",
+          approvedAt: serverTimestamp(),
+        });
+
+        if (borrowedRef && freshItem.type === "Withdraw") {
+          transaction.set(borrowedRef, {
+            userId: freshItem.createdByUid,
+            rpName: freshItem.createdBy || "Unknown",
+            items: freshItem.items.map((withdrawItem) => ({
+              itemId: withdrawItem.inventoryItemId,
+              itemName: withdrawItem.itemName,
+              quantity: Number(
+                withdrawItem.inventoryQuantity ??
+                  Number(withdrawItem.quantity || 1) *
+                    getUnitsPerPackage(withdrawItem.priceTitle || withdrawItem.itemName)
+              ),
+              packageQuantity: Number(withdrawItem.quantity || 1),
+              unitsPerPackage: Number(
+                withdrawItem.unitsPerPackage ||
+                  getUnitsPerPackage(withdrawItem.priceTitle || withdrawItem.itemName)
+              ),
+              priceTitle: withdrawItem.priceTitle || withdrawItem.itemName,
+              unitPrice: Number(withdrawItem.unitPrice || 0),
+              lineTotal: Number(withdrawItem.lineTotal || 0),
+            })),
+            status: "Hutang",
+            returned: false,
+            financeTransactionId: item.id,
+            amount: Number(freshItem.amount || 0),
+            moneyType: freshItem.moneyType || "Uang Putih",
+            paymentType: freshItem.paymentType || "Cash",
+            approvedBy: user.rpName || "Oyabun",
+            approvedByRole: role,
+            approvedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+          });
+        }
+      });
+
+      await loadTransactions();
+      toast.success("Transaksi berhasil di-approve dan stok telah diperbarui");
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message || "Gagal approve transaksi");
+    } finally {
+      setLoading(false);
     }
-
-    toast.success(
-      "Transaksi berhasil di approve"
-    );
-
-  } catch (error) {
-
-    console.error(error);
-
-    toast.error(
-      "Gagal approve transaksi"
-    );
-
-  }
-
-};
+  };
 
 
   // =====================================
@@ -1702,14 +1836,15 @@ Klik Cancel untuk membatalkan.`
               value={
                 form.type
               }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  type:
-                    e.target
-                      .value,
-                })
-              }
+              onChange={(e) => {
+                const nextType = e.target.value;
+                setForm({ ...form, type: nextType });
+                if (nextType !== "Withdraw") {
+                  setWithdrawCart([]);
+                  setSelectedPriceItem("");
+                  setSelectedPriceQuantity(1);
+                           }
+              }}
               className="bg-[#0F0B18] border border-purple-900/30 rounded-2xl px-4 py-3 outline-none focus:border-purple-500"
             >
 
@@ -1755,38 +1890,21 @@ Klik Cancel untuk membatalkan.`
     const moneyType =
       e.target.value;
 
-    setForm(prev => {
+    setForm((prev) => ({
+      ...prev,
+      moneyType,
+    }));
 
-      let amount =
-        prev.amount;
-
-      if (selectedPriceItem) {
-
-        const selectedItem =
-          PRICE_LIST.find(
-            item =>
-              item.title ===
-              selectedPriceItem
-          );
-
-        if (selectedItem) {
-
-          amount =
-            moneyType === "Uang Merah"
-              ? selectedItem.merah
-              : selectedItem.putih;
-
-        }
-
-      }
-
+    setWithdrawCart((previous) => previous.map((cartItem) => {
+      const priceItem = PRICE_LIST.find((price) => price.title === cartItem.priceTitle);
+      if (!priceItem) return cartItem;
+      const unitPrice = moneyType === "Uang Merah" ? priceItem.merah : priceItem.putih;
       return {
-        ...prev,
-        moneyType,
-        amount,
+        ...cartItem,
+        unitPrice,
+        lineTotal: unitPrice * Number(cartItem.quantity || 1),
       };
-
-    });
+    }));
 
   }}
   className="bg-[#0F0B18] border border-purple-900/30 rounded-2xl px-4 py-3 outline-none focus:border-purple-500"
@@ -1803,69 +1921,162 @@ Klik Cancel untuk membatalkan.`
 </select>
 
   {form.type === "Withdraw" && (
+    <div className="md:col-span-2 xl:col-span-6 rounded-3xl border border-purple-700/30 bg-gradient-to-br from-[#1A1028] via-[#130D20] to-[#0F0B18] p-4 sm:p-5 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h3 className="text-base sm:text-lg font-bold text-white">Tambah Barang Withdraw</h3>
+          <p className="text-xs sm:text-sm text-gray-400 mt-1">Pilih barang dari pricelist, tentukan jumlah, lalu masukkan ke keranjang.</p>
+        </div>
+        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-200">
+          <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-400" />
+          {form.moneyType}
+        </span>
+      </div>
 
-<select
-  value={selectedPriceItem}
-  onChange={(e) => {
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_150px_auto] gap-3 items-end">
+        <div className="relative">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-purple-200/80">Barang Pricelist</label>
+          <button
+            type="button"
+            onClick={() => setShowPriceDropdown((open) => !open)}
+            className={`flex min-h-[54px] w-full items-center justify-between gap-3 rounded-2xl border bg-[#0B0812] px-4 py-3 text-left transition-all ${showPriceDropdown ? "border-fuchsia-400 ring-2 ring-purple-500/20" : "border-purple-900/60 hover:border-purple-500/70"}`}
+            aria-expanded={showPriceDropdown}
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-200">
+                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8"><path d="M7 7h10l1 13H6L7 7Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+              </span>
+              <span className="min-w-0">
+                <span className={`block truncate font-semibold ${selectedPriceItem ? "text-white" : "text-gray-400"}`}>{selectedPriceItem || "Pilih barang dari pricelist"}</span>
+                <span className="mt-0.5 block text-xs text-gray-500">{selectedPriceDetails ? selectedPriceDetails.category : "Senjata dan paket tersedia"}</span>
+              </span>
+            </span>
+            <svg viewBox="0 0 24 24" fill="none" className={`h-5 w-5 shrink-0 text-purple-300 transition-transform ${showPriceDropdown ? "rotate-180" : ""}`} stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
 
-    const value = e.target.value;
+          {showPriceDropdown && (
+            <div className="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-purple-600/40 bg-[#160E23] shadow-2xl shadow-black/50">
+              <div className="border-b border-purple-900/50 p-3">
+                <div className="relative">
+                  <svg viewBox="0 0 24 24" fill="none" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" stroke="currentColor" strokeWidth="2"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>
+                  <input
+                    type="text"
+                    value={priceSearch}
+                    onChange={(e) => setPriceSearch(e.target.value)}
+                    placeholder="Cari nama barang..."
+                    className="w-full rounded-xl border border-purple-900/50 bg-[#0B0812] py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-purple-500"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="max-h-64 overflow-y-auto p-2">
+                {["Senjata", "Paket"].map((category) => {
+                  const categoryItems = filteredPriceItems.filter((item) => item.category === category);
+                  if (!categoryItems.length) return null;
+                  return (
+                    <div key={category} className="mb-2 last:mb-0">
+                      <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-purple-300/70">{category}</p>
+                      {categoryItems.map((priceItem) => {
+                        const price = form.moneyType === "Uang Merah" ? priceItem.merah : priceItem.putih;
+                        const active = selectedPriceItem === priceItem.title;
+                        return (
+                          <button
+                            type="button"
+                            key={priceItem.title}
+                            onClick={() => {
+                              setSelectedPriceItem(priceItem.title);
+                              setShowPriceDropdown(false);
+                              setPriceSearch("");
+                            }}
+                            className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${active ? "bg-purple-600/25 text-white" : "text-gray-200 hover:bg-purple-500/10"}`}
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold">{priceItem.title}</span>
+                              <span className="mt-0.5 block text-xs text-gray-500">{category}</span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                              <span className="block text-sm font-bold text-purple-200">Rp {Number(price).toLocaleString("id-ID")}</span>
+                              {active && <span className="text-[10px] text-fuchsia-300">Dipilih</span>}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+                {filteredPriceItems.length === 0 && <p className="px-3 py-6 text-center text-sm text-gray-500">Barang tidak ditemukan.</p>}
+              </div>
+            </div>
+          )}
+        </div>
 
-    setSelectedPriceItem(value);
+        <div>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-purple-200/80">Jumlah</label>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={selectedPriceQuantity}
+            onChange={(e) => setSelectedPriceQuantity(e.target.value)}
+            placeholder="Qty"
+            className="min-h-[54px] w-full rounded-2xl border border-purple-900/60 bg-[#0B0812] px-4 py-3 text-white outline-none transition-all focus:border-fuchsia-500 focus:ring-2 focus:ring-purple-500/20"
+          />
+        </div>
 
-    const selectedItem =
-      PRICE_LIST.find(
-        item => item.title === value
-      );
-
-    if (!selectedItem) return;
-
-    const price =
-      form.moneyType === "Uang Merah"
-        ? selectedItem.merah
-        : selectedItem.putih;
-
-    setForm(prev => ({
-      ...prev,
-      title: selectedItem.title,
-      amount: price,
-    }));
-
-  }}
-  className="bg-[#0F0B18] border border-purple-900/30 rounded-2xl px-4 py-3 outline-none focus:border-purple-500"
->
-
-  <option value="">
-    Pilih Dari Pricelist
-  </option>
-
-  <optgroup label="Senjata">
-    {PRICE_LIST
-      .filter(item => item.category === "Senjata")
-      .map(item => (
-        <option
-          key={item.title}
-          value={item.title}
+        <button
+          type="button"
+          onClick={handleAddWithdrawItem}
+          className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-700 via-purple-700 to-violet-700 px-5 py-3 font-bold text-white shadow-lg shadow-purple-950/30 transition-all hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0"
         >
-          {item.title}
-        </option>
-      ))}
-  </optgroup>
+          <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14"/></svg>
+          Tambah Barang
+        </button>
+      </div>
 
-  <optgroup label="Paket">
-    {PRICE_LIST
-      .filter(item => item.category === "Paket")
-      .map(item => (
-        <option
-          key={item.title}
-          value={item.title}
-        >
-          {item.title}
-        </option>
-      ))}
-  </optgroup>
+      {selectedPriceDetails && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-purple-900/40 bg-black/20 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-300">
+              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-gray-100">{selectedPriceDetails.title}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {selectedMatchedInventory
+                  ? `Stok tersedia: ${Number(selectedMatchedInventory.stock || 0)} · stok akan dipotong otomatis saat disetujui`
+                  : "Nama barang belum cocok di inventory; samakan nama inventory agar stok dapat dipotong otomatis."}
+              </p>
+            </div>
+          </div>
+          <p className="shrink-0 text-lg font-black text-purple-200">Rp {Number(form.moneyType === "Uang Merah" ? selectedPriceDetails.merah : selectedPriceDetails.putih).toLocaleString("id-ID")} <span className="text-xs font-medium text-gray-500">/ item</span></p>
+        </div>
+      )}
+    </div>
+  )}
 
-</select>
-
+{withdrawCart.length > 0 && (
+  <div className="md:col-span-2 xl:col-span-6 bg-[#0F0B18] border border-purple-700/30 rounded-2xl p-4 space-y-3">
+    <div className="flex items-center justify-between gap-3">
+      <h3 className="font-bold text-purple-200">Keranjang Withdraw ({withdrawCart.length} barang)</h3>
+      <button type="button" onClick={() => setWithdrawCart([])} className="text-sm text-purple-300 hover:text-white">Kosongkan</button>
+    </div>
+    {withdrawCart.map((cartItem) => (
+      <div key={cartItem.priceTitle} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-900/30 pb-3 last:border-0 last:pb-0">
+        <div>
+          <p className="font-semibold">{cartItem.priceTitle}</p>
+          <p className="text-xs text-gray-400">Inventory: {cartItem.itemName} · Qty {cartItem.quantity} · Rp {Number(cartItem.unitPrice).toLocaleString("id-ID")} / unit</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-purple-200">Rp {Number(cartItem.unitPrice * cartItem.quantity).toLocaleString("id-ID")}</span>
+          <button type="button" onClick={() => removeWithdrawCartItem(cartItem.priceTitle)} className="text-sm text-red-300 hover:text-red-200">Hapus</button>
+        </div>
+      </div>
+    ))}
+    <div className="flex justify-between items-center border-t border-purple-800/40 pt-3">
+      <span className="text-gray-300">Total Withdraw</span>
+      <span className="text-xl font-black text-purple-200">Rp {withdrawCartTotal.toLocaleString("id-ID")}</span>
+    </div>
+  </div>
 )}
 
 
@@ -2015,39 +2226,29 @@ Klik Cancel untuk membatalkan.`
 )}
 
 
-            <input
-              type="text"
-              placeholder="Judul Transaksi"
-              value={
-                form.title
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  title:
-                    e.target
-                      .value,
-                })
-              }
-              className="bg-[#0F0B18] border border-purple-900/30 rounded-2xl px-4 py-3 outline-none focus:border-purple-500"
-            />
+            {form.type === "Deposit" && (
+              <input
+                type="text"
+                placeholder="Judul Transaksi"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="bg-[#0F0B18] border border-purple-900/30 rounded-2xl px-4 py-3 outline-none focus:border-purple-500"
+              />
+            )}
 
-            <input
-              type="number"
-              placeholder="Harga"
-              value={
-                form.amount
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  amount:
-                    e.target
-                      .value,
-                })
-              }
-              className="bg-[#0F0B18] border border-purple-900/30 rounded-2xl px-4 py-3 outline-none focus:border-purple-500"
-            />
+            {form.type === "Deposit" ? (
+              <input
+                type="number"
+                placeholder="Harga"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                className="bg-[#0F0B18] border border-purple-900/30 rounded-2xl px-4 py-3 outline-none focus:border-purple-500"
+              />
+            ) : (
+              <div className="bg-[#0F0B18] border border-purple-900/30 rounded-2xl px-4 py-3 text-purple-200">
+                Total otomatis: Rp {withdrawCartTotal.toLocaleString("id-ID")}
+              </div>
+            )}
             {form.type === "Deposit" && (
 
   <input
@@ -2235,9 +2436,18 @@ Klik Cancel untuk membatalkan.`
                     </div>
 
                     <p className="text-gray-400 mt-3 text-sm leading-relaxed">
-                      {item.note ||
-                        "Tidak ada catatan"}
+                      {item.note || "Tidak ada catatan"}
                     </p>
+                    {Array.isArray(item.items) && item.items.length > 0 && (
+                      <div className="mt-3 rounded-xl border border-purple-900/30 bg-[#0F0B18] p-3 space-y-2">
+                        {item.items.map((withdrawItem, index) => (
+                          <div key={`${withdrawItem.priceTitle || withdrawItem.itemName}-${index}`} className="flex flex-wrap justify-between gap-2 text-sm">
+                            <span>{withdrawItem.priceTitle || withdrawItem.itemName} × {withdrawItem.quantity}</span>
+                            <span className="text-purple-200">Rp {Number(withdrawItem.lineTotal || (withdrawItem.unitPrice || 0) * (withdrawItem.quantity || 1)).toLocaleString("id-ID")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {item.imageUrl && (
 
   <img

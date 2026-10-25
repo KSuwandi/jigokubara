@@ -44,6 +44,60 @@ export default function InventoryPage() {
   const { role, user } =
     useAuth();
 
+  // Hanya Oyabun yang boleh mengakses Inventory
+if (role !== "Oyabun") {
+  return (
+    <AppLayout>
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#120018] via-[#1b0126] to-black text-white">
+        <div className="w-full max-w-md rounded-[32px] border border-purple-500/30 bg-white/5 backdrop-blur-2xl p-8 text-center shadow-2xl shadow-purple-950/40">
+          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-purple-500/30 bg-purple-600/15 text-purple-300">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="38"
+              height="38"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect
+                x="3"
+                y="11"
+                width="18"
+                height="11"
+                rx="2"
+              />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-purple-300">
+            JIGOKUBARA SECURITY
+          </p>
+
+          <h1 className="mb-3 text-3xl font-black">
+            Access Restricted
+          </h1>
+
+          <p className="mb-6 leading-relaxed text-gray-400">
+            Halaman Inventory hanya dapat diakses oleh Oyabun.
+            Kamu tidak memiliki izin untuk melihat persediaan inventory.
+          </p>
+
+          <button
+            onClick={() => window.history.back()}
+            className="w-full rounded-2xl bg-gradient-to-r from-purple-700 to-fuchsia-700 px-5 py-3 font-bold transition hover:brightness-110"
+          >
+            Kembali
+          </button>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
   const [items, setItems] =
     useState([]);
 
