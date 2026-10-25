@@ -1,0 +1,32 @@
+export const ROLES = {
+  OYABUN: "Oyabun",
+  SHATEI: "Shatei",
+};
+
+export const PERMISSIONS = {
+  APPROVE_WITHDRAW: [
+    ROLES.OYABUN,
+  ],
+
+  DELETE_FINANCE: [
+    ROLES.OYABUN,
+  ],
+
+  DELETE_INVENTORY: [
+    ROLES.OYABUN,
+  ],
+
+  SETTINGS_ACCESS: [
+    ROLES.OYABUN,
+  ],
+
+  CREATE_WITHDRAW: [
+    ROLES.OYABUN,
+    ROLES.SHATEI,
+  ],
+
+  VIEW_DASHBOARD: [
+    ROLES.OYABUN,
+    ROLES.SHATEI,
+  ],
+};
