@@ -59,6 +59,7 @@ const CRAFTING_RECIPES = [
     name: "Medium Armor",
     outputAmount: 1,
     materials: [
+      { item: "Small Armor", qty: 1 },
       { item: "Paketan Jamur", qty: 7 },
       { item: "Botol", qty: 6 },
       { item: "Kulit Jadi", qty: 7 },
