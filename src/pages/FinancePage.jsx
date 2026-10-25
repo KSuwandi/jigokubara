@@ -66,43 +66,43 @@ const PRICE_LIST = [
   {
     category: "Senjata",
     title: "Combat",
-    merah: 200000,
-    putih: 180000,
+    merah: 160000,
+    putih: 130000,
   },
 
   {
     category: "Senjata",
     title: "SMG MK2",
-    merah: 500000,
-    putih: 450000,
+    merah: 460000,
+    putih: 370000,
   },
 
   {
     category: "Senjata",
     title: "MINI SMG",
-    merah: 450000,
-    putih: 415000,
+    merah: 410000,
+    putih: 330000,
   },
 
   {
     category: "Senjata",
     title: "Python",
-    merah: 400000,
-    putih: 360000,
+    merah: 360000,
+    putih: 290000,
   },
 
   {
     category: "Senjata",
     title: "AK-47",
-    merah: 650000,
-    putih: 585000,
+    merah: 610000,
+    putih: 460000,
   },
 
   {
     category: "Senjata",
     title: "Heavy Sniper",
-    merah: 1250000,
-    putih: 1125000,
+    merah: 1300000,
+    putih: 1050000,
   },
 
   {
@@ -115,8 +115,8 @@ const PRICE_LIST = [
   {
     category: "Senjata",
     title: "WM",
-    merah: 150000,
-    putih: 130000,
+    merah: 110000,
+    putih: 90000,
   },
 
 
