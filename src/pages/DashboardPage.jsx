@@ -16,38 +16,214 @@ import {
   AlertTriangle,
   Bell,
   X,
+  Package,
+  Layers3,
+  ArrowUpRight,
+  Activity,
 } from "lucide-react";
 
 import AppLayout from "../layouts/AppLayout";
 import { db } from "../services/firebase/config";
 import { useAuth } from "../contexts/AuthContext";
 
-export default function DashboardPage() {
+const formatNumber = (value) => Number(value || 0).toLocaleString("id-ID");
 
-  const { user, role } = useAuth();
+const inventoryThemes = {
+  DISNAKER: {
+    accent: "text-orange-300",
+    iconBg: "bg-orange-400/10",
+    border: "border-orange-400/20",
+    glow: "from-orange-500/15",
+    bar: "bg-orange-400",
+    dot: "bg-orange-400",
+  },
+  BARHAM: {
+    accent: "text-rose-300",
+    iconBg: "bg-rose-400/10",
+    border: "border-rose-400/20",
+    glow: "from-rose-500/15",
+    bar: "bg-rose-400",
+    dot: "bg-rose-400",
+  },
+  PREPAREAN: {
+    accent: "text-sky-300",
+    iconBg: "bg-sky-400/10",
+    border: "border-sky-400/20",
+    glow: "from-sky-500/15",
+    bar: "bg-sky-400",
+    dot: "bg-sky-400",
+  },
+};
+
+function InventoryPanel({ title, subtitle, items, theme }) {
+  const totalStock = items.reduce(
+    (total, item) => total + Number(item.stock || 0),
+    0
+  );
+  const maxStock = Math.max(
+    ...items.map((item) => Number(item.stock || 0)),
+    1
+  );
+
+  return (
+    <section
+      className={`relative min-w-0 overflow-hidden rounded-[26px] border ${theme.border} bg-[#101116] shadow-[0_18px_55px_rgba(0,0,0,0.22)]`}
+    >
+      <div
+        className={`pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${theme.glow} to-transparent opacity-80`}
+      />
+
+      <div className="relative border-b border-white/[0.07] p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${theme.iconBg} ${theme.accent}`}
+            >
+              <Layers3 size={22} />
+            </div>
+            <div className="min-w-0">
+              <h2 className={`text-lg font-extrabold tracking-wide ${theme.accent}`}>
+                {title}
+              </h2>
+              <p className="mt-1 text-xs text-gray-500">{subtitle}</p>
+            </div>
+          </div>
+
+          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-gray-300">
+            {items.length} item
+          </span>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-white/[0.06] bg-black/20 p-3.5">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Total item
+            </p>
+            <p className="mt-1.5 text-xl font-bold text-white">
+              {formatNumber(items.length)}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/[0.06] bg-black/20 p-3.5">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Total stok
+            </p>
+            <p className={`mt-1.5 text-xl font-bold ${theme.accent}`}>
+              {formatNumber(totalStock)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative p-3 sm:p-4">
+        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">
+          <span>Nama barang</span>
+          <span>Stok tersedia</span>
+        </div>
+
+        <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+          {items.length > 0 ? (
+            items.map((item, index) => {
+              const stock = Number(item.stock || 0);
+              const percentage = Math.max(
+                0,
+                Math.min(100, (stock / maxStock) * 100)
+              );
+
+              return (
+                <div
+                  key={item.id}
+                  className="group rounded-2xl border border-white/[0.055] bg-white/[0.025] px-3.5 py-3.5 transition-all duration-200 hover:border-white/15 hover:bg-white/[0.055]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-[11px] font-bold text-gray-500 transition-colors group-hover:bg-white/10 group-hover:text-gray-300">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-200 transition-colors group-hover:text-white">
+                          {item.name || "Tanpa nama"}
+                        </p>
+                        <div className="mt-2 h-1 w-full max-w-[150px] overflow-hidden rounded-full bg-white/[0.07]">
+                          <div
+                            className={`h-full rounded-full ${theme.bar} transition-all duration-500`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`shrink-0 rounded-xl border ${theme.border} ${theme.iconBg} px-3 py-2 text-sm font-bold tabular-nums ${theme.accent}`}
+                    >
+                      {formatNumber(stock)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 px-4 text-center">
+              <Package size={25} className="text-gray-600" />
+              <p className="mt-3 text-sm font-semibold text-gray-400">
+                Belum ada data inventory
+              </p>
+              <p className="mt-1 text-xs text-gray-600">
+                Data kategori ini akan muncul di sini.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="relative flex items-center justify-between border-t border-white/[0.06] px-5 py-3.5">
+        <span className="text-xs text-gray-500">Inventory overview</span>
+        <span className={`flex items-center gap-1.5 text-xs font-semibold ${theme.accent}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} />
+          Realtime data
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function StatCard({ label, value, description, icon: Icon, theme }) {
+  return (
+    <div className="group relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#111217] p-5 shadow-[0_14px_40px_rgba(0,0,0,0.18)] transition-all duration-300 hover:-translate-y-1 hover:border-white/[0.15] hover:bg-[#15161d] sm:p-6">
+      <div className={`pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full ${theme.glow} blur-2xl transition-all duration-300 group-hover:scale-125`} />
+      <div className="relative flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-gray-400">{label}</p>
+          <p className={`mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl ${theme.value}`}>
+            {formatNumber(value)}
+          </p>
+          <p className="mt-2 text-xs text-gray-500">{description}</p>
+        </div>
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${theme.iconBg} ${theme.value} transition-transform duration-300 group-hover:rotate-6 group-hover:scale-105`}>
+          <Icon size={23} />
+        </div>
+      </div>
+      <div className={`relative mt-5 h-1 overflow-hidden rounded-full bg-white/[0.06]`}>
+        <div className={`h-full w-1/2 rounded-full ${theme.bar}`} />
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const { user } = useAuth();
 
   const [inventory, setInventory] = useState([]);
   const [craftRequests, setCraftRequests] = useState([]);
   const [withdrawRequests, setWithdrawRequests] = useState([]);
 
-  // =========================
-  // NOTIFICATION
-  // =========================
-  const [latestNotification, setLatestNotification] =
-    useState(null);
+  const [latestNotification, setLatestNotification] = useState(null);
+  const [showAnnouncementCard, setShowAnnouncementCard] = useState(true);
 
-  const [showAnnouncementCard, setShowAnnouncementCard] =
-    useState(true);
-
-  // =========================
   // REALTIME DATA
-  // =========================
   useEffect(() => {
-
     const unsubInventory = onSnapshot(
       query(collection(db, "inventory")),
       (snapshot) => {
-
         const data = snapshot.docs
           .map((doc) => ({
             id: doc.id,
@@ -56,7 +232,6 @@ export default function DashboardPage() {
           .filter((item) => !item.deleted);
 
         setInventory(data);
-
       }
     );
 
@@ -65,37 +240,27 @@ export default function DashboardPage() {
     let unsubNotification = () => {};
 
     if (user) {
-
-      // =========================
-      // CRAFT REQUEST
-      // =========================
       unsubCraft = onSnapshot(
         query(
           collection(db, "crafting_requests"),
           where("status", "==", "Pending")
         ),
         (snapshot) => {
-
           setCraftRequests(
             snapshot.docs.map((doc) => ({
               id: doc.id,
               ...doc.data(),
             }))
           );
-
         }
       );
 
-      // =========================
-      // WITHDRAW REQUEST
-      // =========================
       unsubWithdraw = onSnapshot(
         query(
           collectionGroup(db, "finance"),
           where("status", "==", "Pending")
         ),
         (snapshot) => {
-
           const data = snapshot.docs.map((doc) => ({
             id: doc.id,
             ref: doc.ref,
@@ -105,23 +270,16 @@ export default function DashboardPage() {
           const filtered = data.filter(
             (item) =>
               item.status === "Pending" &&
-              (
-                item.type === "Pengeluaran" ||
+              (item.type === "Pengeluaran" ||
                 item.type === "Pembayaran Hutang" ||
-                item.paymentType === "Hutang"
-              )
+                item.paymentType === "Hutang")
           );
 
           setWithdrawRequests(filtered);
-
         }
       );
-
     }
 
-    // =========================
-    // NOTIFICATION
-    // =========================
     unsubNotification = onSnapshot(
       query(
         collection(db, "notification"),
@@ -129,73 +287,43 @@ export default function DashboardPage() {
         limit(1)
       ),
       (snapshot) => {
-
         if (snapshot.empty) {
           setLatestNotification(null);
           return;
         }
 
         const latestDoc = snapshot.docs[0];
-
-        const data = {
+        setLatestNotification({
           id: latestDoc.id,
           ...latestDoc.data(),
-        };
-
-        setLatestNotification(data);
-
+        });
       }
     );
 
     return () => {
-
       unsubInventory();
       unsubCraft();
       unsubWithdraw();
       unsubNotification();
-
     };
-
   }, [user]);
 
-  // =========================
-  // UANG MERAH STOCK
-  // =========================
   const uangMerahStock = useMemo(() => {
-
     const item = inventory.find(
-      (i) =>
-        i.name?.toLowerCase().trim() ===
-        "uang merah"
+      (i) => i.name?.toLowerCase().trim() === "uang merah"
     );
-
     return Number(item?.stock || 0);
-
   }, [inventory]);
 
-  // =========================
-  // UANG PUTIH STOCK
-  // =========================
   const uangPutihStock = useMemo(() => {
-
     const item = inventory.find(
-      (i) =>
-        i.name?.toLowerCase().trim() ===
-        "uang putih"
+      (i) => i.name?.toLowerCase().trim() === "uang putih"
     );
-
     return Number(item?.stock || 0);
-
   }, [inventory]);
 
-  // =========================
-  // PENDING
-  // =========================
   const pendingCrafting = useMemo(
-    () =>
-      craftRequests.filter(
-        (i) => i.status === "Pending"
-      ).length,
+    () => craftRequests.filter((i) => i.status === "Pending").length,
     [craftRequests]
   );
 
@@ -204,9 +332,6 @@ export default function DashboardPage() {
     [withdrawRequests]
   );
 
-  // =========================
-  // CATEGORY
-  // =========================
   const disnakerInventory = inventory.filter(
     (item) => item.category === "DISNAKER"
   );
@@ -217,461 +342,209 @@ export default function DashboardPage() {
 
   const prepareInventory = inventory.filter(
     (item) =>
-      item.category === "PREPARE" ||
-      item.category === "PREPAREAN"
+      item.category === "PREPARE" || item.category === "PREPAREAN"
   );
 
-  // =========================
-  // CARD STYLE
-  // =========================
-  const cardBase =
-    "bg-gradient-to-br from-[#111] to-black border rounded-3xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1";
+  const totalInventoryItems =
+    disnakerInventory.length + barhamInventory.length + prepareInventory.length;
 
   return (
     <AppLayout>
+      <div className="min-h-full w-full px-4 py-6 text-white sm:px-6 lg:px-8">
+        {/* ANNOUNCEMENT */}
+        {latestNotification && showAnnouncementCard && (
+          <section className="relative mb-8 overflow-hidden rounded-[26px] border border-purple-400/20 bg-[#171222] shadow-[0_18px_55px_rgba(90,40,150,0.12)]">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-fuchsia-500/[0.10] via-purple-500/[0.06] to-transparent" />
+            <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl" />
 
-      <div className="text-white w-full p-6">
-
-        {/* ===================================== */}
-        {/* NOTIFICATION CARD */}
-        {/* ===================================== */}
-        {latestNotification &&
-          showAnnouncementCard && (
-
-          <div className="mb-8">
-
-            <div className="relative overflow-hidden rounded-[32px] border border-purple-500/20 bg-gradient-to-br from-[#1a1027] to-[#120d1b] shadow-[0_0_40px_rgba(168,85,247,0.15)]">
-
-              {/* BACKGROUND GLOW */}
-              <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-600/10 via-purple-600/5 to-transparent" />
-
-              {/* CONTENT */}
-              <div className="relative z-10 p-6">
-
-                <div className="flex items-start justify-between gap-5">
-
-                  {/* LEFT SIDE */}
-                  <div className="flex items-start gap-4 flex-1">
-
-                    {/* ICON */}
-                    <div
-                      className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${
-                        latestNotification.type === "Warning"
-                          ? "bg-red-500/15 text-red-300"
-                          : latestNotification.type === "Event"
-                          ? "bg-blue-500/15 text-blue-300"
-                          : latestNotification.type === "News"
-                          ? "bg-green-500/15 text-green-300"
-                          : "bg-purple-500/15 text-purple-300"
-                      }`}
-                    >
-
-                      <Bell size={28} />
-
-                    </div>
-
-                    {/* TEXT */}
-                    <div className="flex-1">
-
-                      <div className="flex flex-wrap items-center gap-3">
-
-                        <span
-                          className={`px-4 py-2 rounded-full text-xs font-bold tracking-[0.15em] uppercase border ${
-                            latestNotification.type === "Warning"
-                              ? "bg-red-500/10 text-red-300 border-red-500/20"
-                              : latestNotification.type === "Event"
-                              ? "bg-blue-500/10 text-blue-300 border-blue-500/20"
-                              : latestNotification.type === "News"
-                              ? "bg-green-500/10 text-green-300 border-green-500/20"
-                              : "bg-purple-500/10 text-purple-300 border-purple-500/20"
-                          }`}
-                        >
-                          {latestNotification.type || "Announcement"}
-                        </span>
-
-                        <span className="text-xs text-gray-500">
-
-                          Latest Notification
-
-                        </span>
-
-                      </div>
-
-                      {/* TITLE */}
-                      <h2 className="text-2xl font-black mt-4 leading-tight">
-
-                        {latestNotification.title}
-
-                      </h2>
-
-                      {/* MESSAGE */}
-                      <p className="text-gray-300 mt-3 leading-7 whitespace-pre-wrap">
-
-                        {latestNotification.message}
-
-                      </p>
-
-                      {/* FOOTER */}
-                      <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-gray-500">
-
-                        <span>
-                          by{" "}
-                          {latestNotification.createdBy ||
-                            "Unknown"}
-                        </span>
-
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                  {/* CLOSE BUTTON */}
-                  <button
-                    onClick={() =>
-                      setShowAnnouncementCard(false)
-                    }
-                    className="
-                      w-11
-                      h-11
-                      rounded-2xl
-                      bg-white/5
-                      hover:bg-white/10
-                      border
-                      border-white/10
-                      flex
-                      items-center
-                      justify-center
-                      transition-all
-                    "
-                  >
-
-                    <X size={18} />
-
-                  </button>
-
-                </div>
-
+            <div className="relative flex items-start gap-4 p-5 sm:p-6">
+              <div
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+                  latestNotification.type === "Warning"
+                    ? "bg-red-500/15 text-red-300"
+                    : latestNotification.type === "Event"
+                    ? "bg-blue-500/15 text-blue-300"
+                    : latestNotification.type === "News"
+                    ? "bg-green-500/15 text-green-300"
+                    : "bg-purple-500/15 text-purple-300"
+                }`}
+              >
+                <Bell size={23} />
               </div>
 
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] ${
+                      latestNotification.type === "Warning"
+                        ? "border-red-400/20 bg-red-400/10 text-red-300"
+                        : latestNotification.type === "Event"
+                        ? "border-blue-400/20 bg-blue-400/10 text-blue-300"
+                        : latestNotification.type === "News"
+                        ? "border-green-400/20 bg-green-400/10 text-green-300"
+                        : "border-purple-400/20 bg-purple-400/10 text-purple-300"
+                    }`}
+                  >
+                    {latestNotification.type || "Announcement"}
+                  </span>
+                  <span className="text-[11px] text-gray-500">
+                    Latest notification
+                  </span>
+                </div>
+
+                <h2 className="mt-3 text-xl font-bold leading-tight text-white sm:text-2xl">
+                  {latestNotification.title}
+                </h2>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">
+                  {latestNotification.message}
+                </p>
+                <p className="mt-4 text-xs text-gray-500">
+                  Published by {latestNotification.createdBy || "Unknown"}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Tutup pengumuman"
+                onClick={() => setShowAnnouncementCard(false)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-gray-400 transition hover:bg-white/10 hover:text-white"
+              >
+                <X size={17} />
+              </button>
             </div>
-
-          </div>
-
+          </section>
         )}
 
-        {/* ===================================== */}
-        {/* HEADER */}
-        {/* ===================================== */}
-        <div className="mb-10">
-
-          <h1 className="text-5xl font-extrabold tracking-tight">
-            Dashboard
-          </h1>
-
-        </div>
-
-        {/* ===================================== */}
-        {/* STATS */}
-        {/* ===================================== */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-
-          {/* UANG MERAH */}
-          <div className={`${cardBase} border-[#7A0019]/40`}>
-
-            <p className="text-gray-400">
-              Uang Merah
+        {/* PAGE HEADER */}
+        <header className="mb-8 flex flex-col justify-between gap-4 border-b border-white/[0.07] pb-7 sm:flex-row sm:items-end">
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
+              Overview
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              Dashboard
+            </h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Ringkasan inventory dan aktivitas operasional.
             </p>
-
-            <h2 className="text-4xl font-bold text-red-400 mt-3">
-              {uangMerahStock.toLocaleString()}
-            </h2>
-
-            <Boxes className="text-red-400 mt-4" />
-
           </div>
 
-          {/* UANG PUTIH */}
-          <div className={`${cardBase} border-green-500/30`}>
+          <div className="flex w-fit items-center gap-2 rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3.5 py-2 text-xs font-medium text-emerald-300">
+            <Activity size={14} />
+            Live monitoring
+          </div>
+        </header>
 
-            <p className="text-gray-400">
-              Uang Putih
-            </p>
-
-            <h2 className="text-3xl font-bold text-green-400 mt-3">
-              {uangPutihStock.toLocaleString()}
-            </h2>
-
-            <Wallet className="text-green-400 mt-4" />
-
+        {/* SUMMARY */}
+        <section>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-gray-200">Ringkasan</h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Informasi utama sistem saat ini
+              </p>
+            </div>
+            <span className="text-[11px] text-gray-600">Realtime</span>
           </div>
 
-          {/* CRAFT */}
-          <div className={`${cardBase} border-yellow-500/30`}>
-
-            <p className="text-gray-400">
-              Pending Crafting
-            </p>
-
-            <h2 className="text-4xl font-bold text-yellow-400 mt-3">
-              {pendingCrafting}
-            </h2>
-
-            <Hammer className="text-yellow-400 mt-4" />
-
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+            <StatCard
+              label="Uang Merah"
+              value={uangMerahStock}
+              description="Stok tersedia"
+              icon={Boxes}
+              theme={{
+                value: "text-rose-300",
+                iconBg: "bg-rose-400/10",
+                glow: "bg-rose-500/15",
+                bar: "bg-rose-400",
+              }}
+            />
+            <StatCard
+              label="Uang Putih"
+              value={uangPutihStock}
+              description="Stok tersedia"
+              icon={Wallet}
+              theme={{
+                value: "text-emerald-300",
+                iconBg: "bg-emerald-400/10",
+                glow: "bg-emerald-500/15",
+                bar: "bg-emerald-400",
+              }}
+            />
+            <StatCard
+              label="Pending Crafting"
+              value={pendingCrafting}
+              description="Menunggu proses"
+              icon={Hammer}
+              theme={{
+                value: "text-amber-300",
+                iconBg: "bg-amber-400/10",
+                glow: "bg-amber-500/15",
+                bar: "bg-amber-400",
+              }}
+            />
+            <StatCard
+              label="Pending Withdraw"
+              value={pendingWithdraw}
+              description="Menunggu persetujuan"
+              icon={AlertTriangle}
+              theme={{
+                value: "text-red-300",
+                iconBg: "bg-red-400/10",
+                glow: "bg-red-500/15",
+                bar: "bg-red-400",
+              }}
+            />
           </div>
+        </section>
 
-          {/* WITHDRAW */}
-          <div className={`${cardBase} border-red-500/30`}>
-
-            <p className="text-gray-400">
-              Pending Withdraw
-            </p>
-
-            <h2 className="text-4xl font-bold text-red-400 mt-3">
-              {pendingWithdraw}
-            </h2>
-
-            <AlertTriangle className="text-red-400 mt-4" />
-
-          </div>
-
-        </div>
-
-        {/* ===================================== */}
         {/* INVENTORY */}
-        {/* ===================================== */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-10">
-
-          {/* DISNAKER */}
-          <div className={`${cardBase}`}>
-
-            <h2 className="text-orange-400 text-2xl font-bold mb-5">
-              DISNAKER
-            </h2>
-
-            <div
-              className="
-                space-y-3
-                max-h-[420px]
-                overflow-y-auto
-                pr-2
-                custom-scrollbar
-              "
-            >
-
-              {disnakerInventory.map((item) => (
-
-                <div
-                  key={item.id}
-                  className="
-                    group
-                    bg-gradient-to-br
-                    from-white/[0.03]
-                    to-white/[0.01]
-                    hover:from-orange-500/10
-                    hover:to-orange-500/5
-                    transition-all
-                    duration-300
-                    p-4
-                    rounded-2xl
-                    border
-                    border-white/5
-                    hover:border-orange-500/30
-                    backdrop-blur-xl
-                    hover:scale-[1.02]
-                  "
-                >
-
-                  <p className="font-semibold">
-                    {item.name}
-                  </p>
-
-                  <div className="flex items-center justify-between mt-3">
-
-                    <span className="text-xs text-gray-500">
-                      Available Stock
-                    </span>
-
-                    <span
-                      className="
-                        px-3
-                        py-1
-                        rounded-full
-                        bg-white/5
-                        border
-                        border-white/10
-                        text-sm
-                        font-semibold
-                      "
-                    >
-                      {Number(item.stock).toLocaleString()}
-                    </span>
-
-                  </div>
-
-                </div>
-
-              ))}
-
+        <section className="mt-10">
+          <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+                <Package size={14} />
+                Stock management
+              </div>
+              <h2 className="text-xl font-bold text-white sm:text-2xl">
+                Inventory Overview
+              </h2>
+              <p className="mt-1.5 text-sm text-gray-500">
+                Rincian stok berdasarkan kategori inventory.
+              </p>
             </div>
-
+            <div className="flex w-fit items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5">
+              <ArrowUpRight size={15} className="text-gray-400" />
+              <span className="text-xs text-gray-400">
+                {formatNumber(totalInventoryItems)} total item
+              </span>
+            </div>
           </div>
 
-          {/* BARHAM */}
-          <div className={`${cardBase}`}>
-
-            <h2 className="text-red-400 text-2xl font-bold mb-5">
-              BARHAM
-            </h2>
-
-            <div
-              className="
-                space-y-3
-                max-h-[420px]
-                overflow-y-auto
-                pr-2
-                custom-scrollbar
-              "
-            >
-
-              {barhamInventory.map((item) => (
-
-                <div
-                  key={item.id}
-                  className="
-                    group
-                    bg-gradient-to-br
-                    from-white/[0.03]
-                    to-white/[0.01]
-                    hover:from-red-500/10
-                    hover:to-red-500/5
-                    transition-all
-                    duration-300
-                    p-4
-                    rounded-2xl
-                    border
-                    border-white/5
-                    hover:border-red-500/30
-                    backdrop-blur-xl
-                    hover:scale-[1.02]
-                  "
-                >
-
-                  <p className="font-semibold">
-                    {item.name}
-                  </p>
-
-                  <div className="flex items-center justify-between mt-3">
-
-                    <span className="text-xs text-gray-500">
-                      Available Stock
-                    </span>
-
-                    <span
-                      className="
-                        px-3
-                        py-1
-                        rounded-full
-                        bg-white/5
-                        border
-                        border-white/10
-                        text-sm
-                        font-semibold
-                      "
-                    >
-                      {Number(item.stock).toLocaleString()}
-                    </span>
-
-                  </div>
-
-                </div>
-
-              ))}
-
-            </div>
-
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-3">
+            <InventoryPanel
+              title="DISNAKER"
+              subtitle="Inventory kategori Disnaker"
+              items={disnakerInventory}
+              theme={inventoryThemes.DISNAKER}
+            />
+            <InventoryPanel
+              title="BARHAM"
+              subtitle="Inventory kategori Barham"
+              items={barhamInventory}
+              theme={inventoryThemes.BARHAM}
+            />
+            <InventoryPanel
+              title="PREPAREAN"
+              subtitle="Inventory kategori Preparean"
+              items={prepareInventory}
+              theme={inventoryThemes.PREPAREAN}
+            />
           </div>
-
-          {/* PREPARE */}
-          <div className={`${cardBase}`}>
-
-            <h2 className="text-blue-400 text-2xl font-bold mb-5">
-              PREPAREAN
-            </h2>
-
-            <div
-              className="
-                space-y-3
-                max-h-[420px]
-                overflow-y-auto
-                pr-2
-                custom-scrollbar
-              "
-            >
-
-              {prepareInventory.map((item) => (
-
-                <div
-                  key={item.id}
-                  className="
-                    group
-                    bg-gradient-to-br
-                    from-white/[0.03]
-                    to-white/[0.01]
-                    hover:from-blue-500/10
-                    hover:to-blue-500/5
-                    transition-all
-                    duration-300
-                    p-4
-                    rounded-2xl
-                    border
-                    border-white/5
-                    hover:border-blue-500/30
-                    backdrop-blur-xl
-                    hover:scale-[1.02]
-                  "
-                >
-
-                  <p className="font-semibold">
-                    {item.name}
-                  </p>
-
-                  <div className="flex items-center justify-between mt-3">
-
-                    <span className="text-xs text-gray-500">
-                      Available Stock
-                    </span>
-
-                    <span
-                      className="
-                        px-3
-                        py-1
-                        rounded-full
-                        bg-white/5
-                        border
-                        border-white/10
-                        text-sm
-                        font-semibold
-                      "
-                    >
-                      {Number(item.stock).toLocaleString()}
-                    </span>
-
-                  </div>
-
-                </div>
-
-              ))}
-
-            </div>
-
-          </div>
-
-        </div>
-
+        </section>
       </div>
-
     </AppLayout>
   );
 }

@@ -289,7 +289,7 @@ animationDelay: `${Math.random() * 2}s`,
                     Place
                   </h2>
                   <p className="text-gray-400 text-sm mt-2">
-                    Roxwood Island
+                    Tequi-la-la
                   </p>
                 </div>
 

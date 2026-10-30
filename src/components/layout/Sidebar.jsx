@@ -253,13 +253,6 @@ useEffect(() => {
       path: "/activity-logs",
       roles: ["Oyabun"],
     },
-
-    {
-      name: "Inventory Approval",
-      icon: ShieldCheck,
-      path: "/inventory-approval",
-      roles: ["Oyabun"],
-    },
     {
   name: "Role Approval",
   icon: ShieldCheck,
