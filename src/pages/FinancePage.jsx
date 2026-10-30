@@ -27,6 +27,7 @@ import AppLayout from "../layouts/AppLayout";
 import imageCompression from "browser-image-compression";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../services/firebase/config";
+import { getCachedInventory, invalidateInventoryCache } from "../services/firebase/inventoryCache";
 
 
 const PRICE_LIST = [
@@ -513,22 +514,8 @@ useEffect(() => {
 
       try {
 
-        const snapshot =
-          await getDocs(
-            collection(
-              db,
-              "inventory"
-            )
-          );
-
-        setInventoryItems(
-          snapshot.docs.map(
-            doc => ({
-              id: doc.id,
-              ...doc.data(),
-            })
-          )
-        );
+        const inventory = await getCachedInventory(db);
+        setInventoryItems(inventory);
 
       } catch (error) {
 
@@ -1153,6 +1140,7 @@ useEffect(() => {
         }
       });
 
+      invalidateInventoryCache();
       await loadTransactions();
       toast.success("Transaksi berhasil di-approve dan stok telah diperbarui");
     } catch (error) {

@@ -15,9 +15,6 @@ import {
   collection,
   doc,
   increment,
-  getDocs,
-  orderBy,
-  query,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
@@ -29,6 +26,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { db } from "../services/firebase/config";
 import { INVENTORY_CATEGORIES } from "../utils/constants";
 import { createActivityLog } from "../utils/activityLogger";
+import { getCachedInventory, invalidateInventoryCache } from "../services/firebase/inventoryCache";
 
 const ITEMS_PER_PAGE = 9;
 
@@ -167,37 +165,19 @@ if (role !== "Oyabun") {
 
       try {
 
-        const snapshot =
-          await getDocs(
-            query(
-              collection(
-                db,
-                "inventory"
-              ),
-              orderBy(
-                "createdAt",
-                "desc"
-              )
-            )
-          );
+        const inventory = await getCachedInventory(db);
 
-        const data =
-          snapshot.docs
-            .map(
-              (doc) => ({
-                id: doc.id,
-                ...doc.data(),
-                category:
-                  normalizeCategory(
-                    doc.data()
-                      .category
-                  ),
-              })
-            )
-            .filter(
-              (item) =>
-                !item.deleted
-            );
+        const data = inventory
+          .map((item) => ({
+            ...item,
+            category: normalizeCategory(item.category),
+          }))
+          .filter((item) => !item.deleted)
+          .sort((a, b) => {
+            const aTime = a?.createdAt?.seconds || 0;
+            const bTime = b?.createdAt?.seconds || 0;
+            return bTime - aTime;
+          });
 
         setItems(data);
 
@@ -399,6 +379,8 @@ if (role !== "Oyabun") {
           }
         );
 
+        invalidateInventoryCache();
+
         await createActivityLog({
           action:
             "ADD_INVENTORY",
@@ -545,6 +527,7 @@ if (role !== "Oyabun") {
               ),
           }
         );
+        invalidateInventoryCache();
 
         toast.success(
           type === "add"
@@ -627,6 +610,7 @@ if (role !== "Oyabun") {
             imageUrl,
           }
         );
+        invalidateInventoryCache();
 
         toast.success(
           "Photo uploaded"
@@ -700,6 +684,7 @@ if (role !== "Oyabun") {
             ),
         }
       );
+      invalidateInventoryCache();
 
       toast.success(
         "Item updated"
@@ -735,6 +720,7 @@ if (role !== "Oyabun") {
             serverTimestamp(),
         }
       );
+      invalidateInventoryCache();
 
       toast.success(
         "Item deleted"
@@ -1138,4 +1124,3 @@ if (role !== "Oyabun") {
     </AppLayout>
   );
 }
-

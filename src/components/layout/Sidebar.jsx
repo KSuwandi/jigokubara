@@ -70,6 +70,11 @@ export default function Sidebar() {
   // =====================================
   useEffect(() => {
 
+    if (role !== "Oyabun") {
+      setCraftingNotif(0);
+      return undefined;
+    }
+
     const craftingQuery =
       query(
         collectionGroup(
@@ -97,12 +102,17 @@ export default function Sidebar() {
     return () =>
       unsubscribe();
 
-  }, []);
+  }, [role]);
 
   // =====================================
   // FINANCE APPROVAL NOTIFICATION
   // =====================================
   useEffect(() => {
+
+    if (role !== "Oyabun") {
+      setFinanceNotif(0);
+      return undefined;
+    }
 
     const financeQuery =
       query(
@@ -131,12 +141,17 @@ export default function Sidebar() {
     return () =>
       unsubscribe();
 
-  }, []);
+  }, [role]);
 
   // =====================================
 // ROLE APPROVAL NOTIFICATION
 // =====================================
 useEffect(() => {
+
+  if (role !== "Oyabun") {
+    setRoleNotif(0);
+    return undefined;
+  }
 
   const roleQuery =
     query(
@@ -166,7 +181,7 @@ useEffect(() => {
   return () =>
     unsubscribe();
 
-}, []);
+}, [role]);
 
   // =====================================
   // MENU

@@ -286,3 +286,90 @@ input[type="range"] {
 ::-webkit-scrollbar-thumb:hover {
   background: #9333ea;
 }
+
+
+/* Floating particles */
+.particle {
+  top: 100%;
+  pointer-events: none;
+  opacity: 0;
+  animation-name: particle-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes particle-rise {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.65;
+  }
+
+  85% {
+    opacity: 0.4;
+  }
+
+  100% {
+    transform: translate3d(20px, -110vh, 0);
+    opacity: 0;
+  }
+}
+
+/* Hero emblem */
+.animate-floating {
+  animation: emblem-float 6s ease-in-out infinite;
+}
+
+@keyframes emblem-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+/* Loading progress */
+.animate-loading {
+  animation: loading-progress 2.2s ease-in-out forwards;
+}
+
+@keyframes loading-progress {
+  0% {
+    width: 0%;
+  }
+
+  30% {
+    width: 35%;
+  }
+
+  70% {
+    width: 75%;
+  }
+
+  100% {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .particle,
+  .animate-floating,
+  .animate-loading {
+    animation: none !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+}

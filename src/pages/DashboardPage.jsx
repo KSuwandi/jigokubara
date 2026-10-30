@@ -5,6 +5,8 @@ import {
   onSnapshot,
   query,
   orderBy,
+  where,
+  limit,
 } from "firebase/firestore";
 
 import {
@@ -25,7 +27,6 @@ export default function DashboardPage() {
   const { user, role } = useAuth();
 
   const [inventory, setInventory] = useState([]);
-  const [finance, setFinance] = useState([]);
   const [craftRequests, setCraftRequests] = useState([]);
   const [withdrawRequests, setWithdrawRequests] = useState([]);
 
@@ -59,7 +60,6 @@ export default function DashboardPage() {
       }
     );
 
-    let unsubFinance = () => {};
     let unsubCraft = () => {};
     let unsubWithdraw = () => {};
     let unsubNotification = () => {};
@@ -67,27 +67,13 @@ export default function DashboardPage() {
     if (user) {
 
       // =========================
-      // FINANCE
-      // =========================
-      unsubFinance = onSnapshot(
-        query(collection(db, "users", user.uid, "finance")),
-        (snapshot) => {
-
-          setFinance(
-            snapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            }))
-          );
-
-        }
-      );
-
-      // =========================
       // CRAFT REQUEST
       // =========================
       unsubCraft = onSnapshot(
-        query(collection(db, "crafting_requests")),
+        query(
+          collection(db, "crafting_requests"),
+          where("status", "==", "Pending")
+        ),
         (snapshot) => {
 
           setCraftRequests(
@@ -106,7 +92,7 @@ export default function DashboardPage() {
       unsubWithdraw = onSnapshot(
         query(
           collectionGroup(db, "finance"),
-          orderBy("createdAt", "desc")
+          where("status", "==", "Pending")
         ),
         (snapshot) => {
 
@@ -139,7 +125,8 @@ export default function DashboardPage() {
     unsubNotification = onSnapshot(
       query(
         collection(db, "notification"),
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "desc"),
+        limit(1)
       ),
       (snapshot) => {
 
@@ -163,7 +150,6 @@ export default function DashboardPage() {
     return () => {
 
       unsubInventory();
-      unsubFinance();
       unsubCraft();
       unsubWithdraw();
       unsubNotification();

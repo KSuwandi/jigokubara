@@ -4,7 +4,7 @@ import {
   collection,
   collectionGroup,
   onSnapshot,
-  orderBy,
+  where,
   query,
   runTransaction,
   serverTimestamp,
@@ -87,7 +87,7 @@ export default function FinanceApprovalPage() {
 
     const q = query(
       collectionGroup(db, "finance"),
-      orderBy("createdAt", "desc")
+      where("status", "==", "Pending")
     );
 
     const unsubscribe = onSnapshot(
@@ -99,7 +99,15 @@ export default function FinanceApprovalPage() {
           ...financeDoc.data(),
         }));
 
-        setTransactions(data.filter((item) => item.status === "Pending"));
+        // Urutkan di client agar query cukup memakai satu filter dan tidak
+        // memerlukan composite index tambahan.
+        data.sort((a, b) => {
+          const aTime = a.createdAt?.seconds ?? (a.createdAt ? new Date(a.createdAt).getTime() / 1000 : 0);
+          const bTime = b.createdAt?.seconds ?? (b.createdAt ? new Date(b.createdAt).getTime() / 1000 : 0);
+          return bTime - aTime;
+        });
+
+        setTransactions(data);
       },
       (error) => {
         console.error("Gagal mengambil transaksi finance:", error);

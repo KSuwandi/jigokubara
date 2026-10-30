@@ -7,11 +7,13 @@ import {
 import {
   collection,
   onSnapshot,
+  query,
   doc,
   deleteDoc,
   updateDoc,
   addDoc,
   serverTimestamp,
+  where,
 } from "firebase/firestore";
 
 import AppLayout from "../layouts/AppLayout";
@@ -449,56 +451,31 @@ useEffect(() => {
 
     const unsub =
       onSnapshot(
-        collection(
-          db,
-          "crafting_history"
+        query(
+          collection(
+            db,
+            "crafting_history"
+          ),
+          where(
+            "craftedByUid",
+            "==",
+            selectedMember.uid || selectedMember.id
+          )
         ),
         (snap) => {
 
-          const raw =
-            snap.docs.map(
-              (d) => ({
+          const filtered =
+            snap.docs
+              .map((d) => ({
                 id: d.id,
                 ...d.data(),
-              })
-            );
-
-          const filtered =
-            raw
-              .filter(
-                (
-                  item
-                ) => {
-
-                  return (
-                    item.craftedByUid ===
-                    selectedMember.uid
-                  );
-                }
-              )
-
-              // SORT NEWEST
-              .sort(
-                (a, b) => {
-
-                  const aTime =
-                    a
-                      ?.createdAt
-                      ?.seconds ||
-                    0;
-
-                  const bTime =
-                    b
-                      ?.createdAt
-                      ?.seconds ||
-                    0;
-
-                  return (
-                    bTime -
-                    aTime
-                  );
-                }
-              );
+              }))
+              // SORT NEWEST locally; the Firestore query filters by member first.
+              .sort((a, b) => {
+                const aTime = a?.createdAt?.seconds || 0;
+                const bTime = b?.createdAt?.seconds || 0;
+                return bTime - aTime;
+              });
 
           setCraftingData(
             filtered

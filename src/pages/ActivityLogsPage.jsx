@@ -6,6 +6,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  limit,
 } from "firebase/firestore";
 
 import {
@@ -76,7 +77,8 @@ export default function ActivityLogsPage() {
       orderBy(
         "createdAt",
         "desc"
-      )
+      ),
+      limit(100)
     );
 
     const unsub =
@@ -113,7 +115,8 @@ useEffect(() => {
     orderBy(
       "createdAt",
       "desc"
-    )
+    ),
+    limit(100)
   );
 
   const unsub =
@@ -151,7 +154,8 @@ useEffect(() => {
     orderBy(
       "createdAt",
       "desc"
-    )
+    ),
+    limit(100)
   );
 
   const unsub =
@@ -733,8 +737,8 @@ case "crafting_completed":
             </div>
 
             <p className="text-gray-400 mt-4 max-w-2xl">
-              Monitor all inventory movements, crafting activity,
-              approvals, and member actions in real-time.
+              Monitor recent inventory movements, crafting activity,
+              approvals, and member actions in real-time. Showing up to 100 latest records per log category.
             </p>
 
           </div>
